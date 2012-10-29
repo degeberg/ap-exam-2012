@@ -56,8 +56,8 @@ princess_unset(P) ->
         {From, {put, T}} ->
             reply(From, ok),
             try P(T) of
-                true -> princess_set(T);
-                _    -> princess_unset(P)
+                false -> princess_unset(P);
+                _     -> princess_set(T)
             catch
                 _ -> princess_unset(P)
             end
