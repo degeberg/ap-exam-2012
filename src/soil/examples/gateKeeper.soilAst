@@ -1,0 +1,42 @@
+(
+	[Func {
+		funcname = "printer", 
+		params = [], 
+		receive = "message", 
+		body = Acts [(SendTo [Par "message"] (Id "println"))]
+		}
+	,Func {
+		funcname = "gate", 
+		params = ["fst", "fstmsg"], 
+		receive = "message", 
+		body = CaseOf (Par "message") [
+			(["snd", "sndmsg"]
+				, IfEq (Par "fst") (Id "none")
+					(Acts [(Become (Id "gate") [Par "snd", Par "sndmsg"])])
+					(Acts [
+						(SendTo [Par "fstmsg", Par "sndmsg"] 
+							(Concat (Par "fst") (Par "snd"))
+						),
+						(Become (Id "gate") [Id "none", Id "none"])]
+					)
+			)]
+			(Acts [])
+		}
+	,Func {
+		funcname = "repeat", 
+		params = ["other"], 
+		receive = "message", 
+		body = Acts [
+			(SendTo [Par "message"] (Id "gatekeeper")),
+			(SendTo [Par "message"] (Par "other"))]
+		}
+	],
+	[Create (Id "foobar") (Id "printer") []
+	,Create (Id "gatekeeper") (Id "gate") [Id "none", Id "none"]
+	,Create (Id "repeater1") (Id "repeat") [Id "repeater2"]
+	,Create (Id "repeater2") (Id "repeat") [Id "repeater1"]
+	,SendTo [Id "foo", Id "Hello"] (Id "repeater1")
+	,SendTo [Id "bar", Id "World"] (Id "repeater2")
+	,SendTo [Id "foo", Id "Bye"] (Id "repeater1")
+	]
+) 

@@ -1,0 +1,13 @@
+(
+	[Func {
+		funcname = "print", 
+		params = [], 
+		receive = "message", 
+		body = Acts [(SendTo [Par "message"] (Id "println"))]}
+	],
+	[Create (Id "hw1") (Id "print") []
+	,Create (Id "hw2") (Id "print") []
+	,SendTo [Id "Hello"] (Id "hw1")
+	,SendTo [Id "World"] (Id "hw2")
+	]
+)

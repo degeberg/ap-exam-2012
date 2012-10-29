@@ -1,0 +1,24 @@
+let #dub() from message  = 
+  case message of
+    (sender, msg) : send (self, msg) to sender
+                    send (self, msg) to sender
+    _             : send (#FaultyMessage) to #println 
+  end
+end
+
+let #half(state) from message = 
+  if state == #skip then
+    become #half(#return)
+    send (#SkippingMessage) to #println
+  else
+    case message of
+      (sender, msg) : become #half(#skip)
+                      send (self, msg) to sender
+      _             : send (#FaultyMessage) to #println 
+    end
+  end
+end
+    
+create #dubproc with #dub()
+create #halfproc with #half(#return)
+send (#halfproc, #foo) to #dubproc

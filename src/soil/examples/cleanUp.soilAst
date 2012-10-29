@@ -1,0 +1,37 @@
+(
+	[Func {
+		funcname = "dub", 
+		params = [], 
+		receive = "message", 
+		body = CaseOf (Par "message") [
+			(["sender", "msg"]
+				,Acts [
+					(SendTo [Self, Par "msg"] (Par "sender")),
+					(SendTo [Self, Par "msg"] (Par "sender"))]
+			)]
+			(Acts [(SendTo [Id "FaultyMessage"] (Id "println"))])
+		}
+	,Func {
+		funcname = "half", 
+		params = ["state"], 
+		receive = "message", 
+		body = IfEq (Par "state") (Id "skip")
+			(Acts [
+					(Become (Id "half") [Id "return"]),
+					(SendTo [Id "SkippedMessage"] (Par "println"))]
+			)
+			(CaseOf (Par "message") [
+				(["sender", "msg"]
+					,Acts [
+						(Become (Id "half") [Id "skip"]),
+						(SendTo [Self, Par "msg"] (Par "sender"))]
+				)]
+				(Acts [(SendTo [Id "FaultyMessage"] (Id "println"))])
+			)
+		}
+	],
+	[Create (Id "dubproc") (Id "dub") []
+	,Create (Id "halfproc") (Id "half") [Id "return"]
+	,SendTo [Id "halfproc", Id "foo"] (Id "dubproc")
+	]
+) 

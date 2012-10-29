@@ -1,0 +1,29 @@
+let #printer () from message = 
+  send (message) to #println
+end
+
+let #gate (fst, fstmsg) from message = 
+  case message of
+    (snd, sndmsg) : 
+      if fst == #none then
+        become #gate(snd, sndmsg)
+      else
+        send (fstmsg, sndmsg) to fst concat snd
+        become #gate(#none, #none)
+      end
+    _ : 
+  end
+end
+
+let #repeat (other) from message = 
+  send (message) to #gatekeeper
+  send (message) to other
+end
+  
+create #foobar with #printer()
+create #gatekeeper with #gate(#none, #none)
+create #repeater1 with #repeat(#repeater2)
+create #repeater2 with #repeat(#repeater1)
+send (#foo, #Hello) to #repeater1()
+send (#bar, #World) to #repeater2()
+send (#foo, #Bye) to #repeater1()

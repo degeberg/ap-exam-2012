@@ -1,0 +1,8 @@
+let #print() from message = 
+  send (message) to #println
+end
+
+create #hw1 with #print()
+create #hw2 with #print()
+send (#Hello) to #hw1
+send (#World) to #hw2
