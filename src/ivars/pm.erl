@@ -2,6 +2,8 @@
 
 -export([newVanilla/0, newPrincess/1, get/1, put/2, compromised/1]).
 
+-include_lib("eunit/include/eunit.hrl").
+
 -record(vState, {value, compromised}).
 
 newVanilla() ->
@@ -68,3 +70,64 @@ princess_set(V) ->
             reply(From, V),
             princess_set(V)
     end.
+
+% Tests:
+
+princess_unset_not_compromised_test() ->
+    P = newPrincess(fun(_) -> true end),
+    ?assert(compromised(P) =:= false).
+
+princess_set_not_compromised_test() ->
+    P = newPrincess(fun(_) -> true end),
+    ?MODULE:put(P, 1),
+    ?assert(compromised(P) =:= false).
+
+princess_double_set_not_compromised_test() ->
+    P = newPrincess(fun(_) -> true end),
+    ?MODULE:put(P, 1),
+    ?MODULE:put(P, 1),
+    ?assert(compromised(P) =:= false).
+
+princess_cannot_change_value_test() ->
+    P = newPrincess(fun(_) -> true end),
+    ?MODULE:put(P, 1),
+    ?MODULE:put(P, 2),
+    ?assert(?MODULE:get(P) =:= 1).
+
+princess_only_add_valid_value_test() ->
+    P = newPrincess(fun(X) -> X =:= 2 end),
+    ?MODULE:put(P, 1),
+    ?MODULE:put(P, 2),
+    ?assert(?MODULE:get(P) =:= 2).
+
+princess_predicate_exception_test() ->
+    P = newPrincess(fun(X) ->
+        case X =:= 1 of
+            true -> throw(foo);
+            false -> true
+        end
+    end),
+    ?MODULE:put(P, 1),
+    ?MODULE:put(P, 2),
+    ?assert(?MODULE:get(P) =:= 2).
+
+vanilla_unset_not_compromised_test() ->
+    P = newVanilla(),
+    ?assert(compromised(P) =:= false).
+
+vanilla_set_not_compromised_test() ->
+    P = newVanilla(),
+    ?MODULE:put(P, 1),
+    ?assert(compromised(P) =:= false).
+
+vanilla_double_set_compromised_test() ->
+    P = newVanilla(),
+    ?MODULE:put(P, 1),
+    ?MODULE:put(P, 2),
+    ?assert(compromised(P) =:= true).
+
+vanilla_cannot_change_value_test() ->
+    P = newVanilla(),
+    ?MODULE:put(P, 1),
+    ?MODULE:put(P, 2),
+    ?assert(?MODULE:get(P) =:= 1).
