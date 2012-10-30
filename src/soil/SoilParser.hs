@@ -25,8 +25,8 @@ parseFile f = do s <- readFile f
 
 program :: ReadP Program
 program = do p <- defOps
-             eof
              skipSpaces
+             eof
              return p
 
 defOps :: ReadP Program
@@ -67,7 +67,16 @@ expr = do stoken "if"
    +++ liftM Acts (many actOp)
 
 cases :: ReadP ([([Name], Expr)], Expr)
-cases = undefined
+cases = do cs <- many case1
+           d <- option (Acts []) cased
+           return (cs, d)
+    where case1 = do p <- parens parameters
+                     ctoken ':'
+                     e <- expr
+                     return (p, e)
+          cased = do ctoken '_'
+                     ctoken ':'
+                     expr
 
 parameters :: ReadP [Name]
 parameters = sepBy name (ctoken ',')
