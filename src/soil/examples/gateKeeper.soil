@@ -24,6 +24,6 @@ create #foobar with #printer()
 create #gatekeeper with #gate(#none, #none)
 create #repeater1 with #repeat(#repeater2)
 create #repeater2 with #repeat(#repeater1)
-send (#foo, #Hello) to #repeater1()
-send (#bar, #World) to #repeater2()
-send (#foo, #Bye) to #repeater1()
+send (#foo, #Hello) to #repeater1
+send (#bar, #World) to #repeater2
+send (#foo, #Bye) to #repeater1
