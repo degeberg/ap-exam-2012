@@ -13,7 +13,7 @@ newPrincess(P) ->
     {princess, Pid}.
 
 get({_Flavour, Pid}) -> rpc(Pid, get).
-put({_Flavour, Pid}, T) -> rpc(Pid, {put, T}).
+put({_Flavour, Pid}, T) -> Pid ! {put, T}, T.
 
 compromised({vanilla, Pid})   -> rpc(Pid, compromised);
 compromised({princess, _Pid}) -> false.
@@ -30,8 +30,7 @@ reply(From, Msg) ->
 
 vanilla_unset() ->
     receive
-        {From, {put, T}} ->
-            reply(From, ok),
+        {put, T} ->
             vanilla_set(#vState{value=T, compromised=false});
         {From, compromised} ->
             reply(From, false),
@@ -43,21 +42,19 @@ vanilla_set(S = #vState{value=V, compromised=C}) ->
         {From, compromised} ->
             reply(From, C),
             vanilla_set(S);
-        {From, {put, _T}} ->
-            reply(From, {error, already_set}),
+        {put, _T} ->
             vanilla_set(S#vState{compromised=true});
         {From, get} ->
-            reply(From, {ok, V}),
+            reply(From, V),
             vanilla_set(S)
     end.
 
 princess_unset(P) ->
     receive
-        {From, {put, T}} ->
-            reply(From, ok),
+        {put, T} ->
             try P(T) of
-                false -> princess_unset(P);
-                _     -> princess_set(T)
+                true -> princess_set(T);
+                _    -> princess_unset(P)
             catch
                 _ -> princess_unset(P)
             end
@@ -65,10 +62,9 @@ princess_unset(P) ->
 
 princess_set(V) ->
     receive
-        {From, {put, _}} ->
-            reply(From, {error, already_set}),
+        {put, _} ->
             princess_set(V);
         {From, get} ->
-            reply(From, {ok, V}),
+            reply(From, V),
             princess_set(V)
     end.
