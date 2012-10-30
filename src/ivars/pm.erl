@@ -102,9 +102,9 @@ princess_only_add_valid_value_test() ->
 
 princess_predicate_exception_test() ->
     P = newPrincess(fun(X) ->
-        case X =:= 1 of
-            true -> throw(foo);
-            false -> true
+        case X of
+            1 -> throw(foo);
+            _ -> true
         end
     end),
     ?MODULE:put(P, 1),
