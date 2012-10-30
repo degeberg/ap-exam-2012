@@ -75,30 +75,30 @@ princess_set(V) ->
 
 princess_unset_not_compromised_test() ->
     P = newPrincess(fun(_) -> true end),
-    ?assert(compromised(P) =:= false).
+    ?assertNot(compromised(P)).
 
 princess_set_not_compromised_test() ->
     P = newPrincess(fun(_) -> true end),
     ?MODULE:put(P, 1),
-    ?assert(compromised(P) =:= false).
+    ?assertNot(compromised(P)).
 
 princess_double_set_not_compromised_test() ->
     P = newPrincess(fun(_) -> true end),
     ?MODULE:put(P, 1),
     ?MODULE:put(P, 1),
-    ?assert(compromised(P) =:= false).
+    ?assertNot(compromised(P)).
 
 princess_cannot_change_value_test() ->
     P = newPrincess(fun(_) -> true end),
     ?MODULE:put(P, 1),
     ?MODULE:put(P, 2),
-    ?assert(?MODULE:get(P) =:= 1).
+    ?assertEqual(?MODULE:get(P), 1).
 
 princess_only_add_valid_value_test() ->
     P = newPrincess(fun(X) -> X =:= 2 end),
     ?MODULE:put(P, 1),
     ?MODULE:put(P, 2),
-    ?assert(?MODULE:get(P) =:= 2).
+    ?assertEqual(?MODULE:get(P), 2).
 
 princess_predicate_exception_test() ->
     P = newPrincess(fun(X) ->
@@ -109,25 +109,25 @@ princess_predicate_exception_test() ->
     end),
     ?MODULE:put(P, 1),
     ?MODULE:put(P, 2),
-    ?assert(?MODULE:get(P) =:= 2).
+    ?assertEqual(?MODULE:get(P), 2).
 
 vanilla_unset_not_compromised_test() ->
     P = newVanilla(),
-    ?assert(compromised(P) =:= false).
+    ?assertNot(compromised(P)).
 
 vanilla_set_not_compromised_test() ->
     P = newVanilla(),
     ?MODULE:put(P, 1),
-    ?assert(compromised(P) =:= false).
+    ?assertNot(compromised(P)).
 
 vanilla_double_set_compromised_test() ->
     P = newVanilla(),
     ?MODULE:put(P, 1),
     ?MODULE:put(P, 2),
-    ?assert(compromised(P) =:= true).
+    ?assert(compromised(P)).
 
 vanilla_cannot_change_value_test() ->
     P = newVanilla(),
     ?MODULE:put(P, 1),
     ?MODULE:put(P, 2),
-    ?assert(?MODULE:get(P) =:= 1).
+    ?assertEqual(?MODULE:get(P), 1).
