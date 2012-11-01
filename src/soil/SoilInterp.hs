@@ -8,11 +8,11 @@ module SoilInterp where
 import SoilAst
 
 import qualified Data.Map as M
+import qualified Data.Foldable as F
 import Data.Maybe
 import Data.List (intercalate)
 import Control.Monad.State
 import Control.Arrow ((&&&))
-import Control.Applicative (pure)
 
 --
 -- Part 1: Define a name environment
@@ -30,8 +30,7 @@ insertName n = M.insertWith (\_ -> error $ "Duplicate name '" ++ n ++ "'") n
 
 insertNames :: [Name] -> [Ident] -> NameEnv -> NameEnv
 insertNames ns is e
-  = foldr (\(n, i) env -> insertName n i env) e (zipWith (\n i -> (n, [i])) ns is)
-
+  = foldr (\(n, i) env -> insertName n i env) e (zipWith (flip (,) . return) ns is)
 
 --
 -- Part 2: Define a function environment
@@ -82,13 +81,8 @@ setArguments args = procOp (\p -> p { arguments = args })
 getArguments :: Ident -> ProcessQueue -> [Ident]
 getArguments pid procq = fromJust $ lookup pid procq >>= Just . arguments
 
-getMsg' :: Process -> Maybe Message
-getMsg' p = case mailbox p of
-             []    -> Nothing
-             (x:_) -> Just x
-
 getMsg :: Ident -> ProcessQueue -> Maybe Message
-getMsg pid procq = lookup pid procq >>= getMsg'
+getMsg pid procq = lookup pid procq >>= listToMaybe . mailbox
 
 removeMsg :: Ident -> ProcessState ()
 removeMsg = procOp (\p -> p { mailbox = tail $ mailbox p } )
@@ -127,7 +121,7 @@ evalPrim :: Prim -> ProcessState [Ident]
 evalPrim (Id n)       = return [n]
 evalPrim (Par n)      = do s <- get
                            return $ lookupName n (nEnv s)
-evalPrim Self         = gets $ pure . getPid
+evalPrim Self         = gets $ return . getPid
 evalPrim (Concat a b) = do aPrim <- evalPrim a
                            bPrim <- evalPrim b
                            return [concat (aPrim ++ bPrim)]
@@ -172,21 +166,23 @@ interpAct (Become funid vals)
        setArguments (concat vals') (getPid s)
        setFunction funid' (getPid s)
 
+processStep' :: Ident -> Message -> ProcessState ()
+processStep' pid msg
+  = do s <- get
+       case getFunction pid (pq s) >>= flip lookupFunc (fEnv s) of
+         Nothing  -> errorlog ["undefFunc"]
+         Just fun -> do let nEnv' = insertName (receive fun) msg (nEnv s)
+                        let nEnv'' = insertNames (params fun) (getArguments pid (pq s)) nEnv'
+                        put s { nEnv=nEnv'', getPid = pid }
+                        removeMsg pid -- will not fail
+                        interpExpr (body fun)
+                        s' <- get
+                        put s' { nEnv = nEnv s } -- restore nEnv
+
 processStep :: Ident -> ProcessState ()
 processStep pid
   = do s <- get
-       case getMsg pid (pq s) of
-         Nothing -> return ()
-         Just msg -> case getFunction pid (pq s) >>= flip lookupFunc (fEnv s) of
-                      Nothing -> errorlog ["undefFunc"]
-                      Just fun -> do let nEnv' = insertName (receive fun) msg (nEnv s)
-                                     let nEnv'' = insertNames (params fun) (getArguments pid (pq s)) nEnv'
-                                     put s { nEnv=nEnv'', getPid = pid }
-                                     removeMsg pid -- will not fail
-                                     interpExpr (body fun)
-                                     s' <- get
-                                     put s' { nEnv = nEnv s }
-                                     return ()
+       F.forM_ (getMsg pid (pq s)) (processStep' pid)
 
 --
 -- Part 5: Define and implement the round-robin algorithm
