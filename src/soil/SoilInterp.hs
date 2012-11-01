@@ -11,6 +11,7 @@ import qualified Data.Map as M
 import Data.Maybe
 import Data.List (intercalate)
 import Control.Monad.State
+import Control.Arrow ((&&&))
 
 --
 -- Part 1: Define a name environment
@@ -221,12 +222,11 @@ runProgRR' :: Int -> ProcessState ()
 runProgRR' 0 = return ()
 runProgRR' n = nextProcessRR >>= processStep >> runProgRR' (n - 1)
 
-runProgRR :: Int -> Program -> ([String], [String])
-runProgRR n (fs, as) = (stdout s, stderr s)
-    where s = execState (interpExpr (Acts as) >> runProgRR' n) (progInit fs)
-
 runProgRRfinal :: Int -> Program -> PState
 runProgRRfinal n (fs, as) = execState (interpExpr (Acts as) >> runProgRR' n) (progInit fs)
+
+runProgRR :: Int -> Program -> ([String], [String])
+runProgRR n = (stdout &&& stderr) . runProgRRfinal n
 
 --
 -- Part 7: Implement a find all possible executions evaluator
