@@ -88,12 +88,11 @@ getMsg :: Ident -> ProcessQueue -> Maybe Message
 getMsg pid procq = lookup pid procq >>= getMsg'
 
 removeMsg :: Ident -> ProcessState ()
-removeMsg i = do s <- get
-                 let p   = fromJust $ lookup i (pq s)
-                 let p'  = p { mailbox = tail $ mailbox p }
-                 let pq' = pqOp (\_ -> p') i (pq s)
-                 put s { pq = pq' }
-                 return ()
+removeMsg pid = do s <- get
+                   let p   = fromJust $ lookup pid (pq s)
+                   let p'  = p { mailbox = tail $ mailbox p }
+                   let pq' = pqOp (\_ -> p') pid (pq s)
+                   put s { pq = pq' }
 
 getFunction :: Ident -> ProcessQueue -> Maybe Ident
 getFunction pid procq = lookup pid procq >>= Just . function
@@ -190,8 +189,8 @@ processStep pid
                       Nothing -> errorlog ["undefFunc"]
                       Just fun -> do let nEnv' = insertName (receive fun) msg (nEnv s)
                                      let nEnv'' = insertNames (params fun) (getArguments pid (pq s)) nEnv'
-                                     removeMsg pid
                                      put s { nEnv=nEnv'', getPid = pid }
+                                     removeMsg pid -- will not fail
                                      interpExpr (body fun)
                                      s' <- get
                                      put s' { nEnv = nEnv s }
