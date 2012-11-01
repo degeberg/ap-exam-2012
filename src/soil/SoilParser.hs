@@ -3,13 +3,13 @@
 -- To be used at the exam for Advanced Programming, B1-2012
 --
 
-module SoilParser where
+module SoilParser (parseString, parseFile) where
 
 import SoilAst
 
 import Text.ParserCombinators.ReadP
 import Data.Char (isAlphaNum, isLetter)
-import Control.Monad (liftM)
+import Control.Monad (liftM, (<=<))
 import Control.Applicative ((<$>), (<*>))
 
 type Error = String
@@ -20,8 +20,7 @@ parseString s = case readP_to_S program s of
                   (x:_) -> Right $ fst x -- there shouldn't be multiple parses
 
 parseFile :: FilePath -> IO (Either Error Program)
-parseFile f = do s <- readFile f
-                 return $ parseString s
+parseFile = return . parseString <=< readFile
 
 program :: ReadP Program
 program = do p <- defOps
