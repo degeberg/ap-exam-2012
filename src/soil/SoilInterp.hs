@@ -67,8 +67,11 @@ addMsg' :: Message -> Process -> Process
 addMsg' m p = let box = mailbox p
               in p { mailbox = box ++ [m] }
 
-addMsg :: Message -> Ident -> ProcessQueue -> ProcessQueue
-addMsg msg = pqOp (addMsg' msg)
+addMsg :: Message -> Ident -> ProcessState ()
+addMsg msg pid = do s <- get
+                    case lookup pid (pq s) of
+                      Nothing -> errorlog ["invalidReceiver", pid]
+                      Just _  -> put s { pq = pqOp (addMsg' msg) pid (pq s) }
 
 setFunction :: Ident -> Ident -> ProcessQueue -> ProcessQueue
 setFunction funid = pqOp (\p -> p{function=funid})
@@ -155,14 +158,12 @@ interpExpr (Acts as)
 
 interpAct :: ActOp -> ProcessState ()
 interpAct (SendTo msgs receiver)
-  = do s         <- get
-       receiver' <- evalPrim receiver
+  = do receiver' <- evalPrim receiver
        msgs'     <- mapM evalPrim msgs
        case receiver' of
            ["println"]  -> println (concat msgs')
            ["errorlog"] -> errorlog (concat msgs')
-           [r]          -> do let pq' = addMsg (concat msgs') r (pq s)
-                              put s { pq = pq' }
+           [r]          -> addMsg (concat msgs') r
            x            -> error $ "invalid receiver '" ++ show x ++ "'"
 interpAct (Create pid funid vals)
   = do [funid'] <- evalPrim funid
