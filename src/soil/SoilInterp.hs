@@ -26,6 +26,11 @@ lookupName n e = fromMaybe (error $ "Invalid name '" ++ n ++ "'") (M.lookup n e)
 insertName :: Name -> [Ident] -> NameEnv -> NameEnv
 insertName n = M.insertWith (\_ -> error $ "Duplicate name '" ++ n ++ "'") n
 
+insertNames :: [Name] -> [Ident] -> NameEnv -> NameEnv
+insertNames ns is e
+  = foldr (\(n, i) env -> insertName n i env) e (zipWith (\n i -> (n, [i])) ns is)
+
+
 --
 -- Part 2: Define a function environment
 --
@@ -70,6 +75,9 @@ setFunction funid = pqOp (\p -> p{function=funid})
 setArguments :: [Ident] -> Ident -> ProcessQueue -> ProcessQueue
 setArguments args = pqOp (\p -> p{arguments=args})
 
+getArguments :: Ident -> ProcessQueue -> [Ident]
+getArguments pid procq = fromJust $ lookup pid procq >>= Just . arguments
+
 getMsg' :: Process -> Maybe Message
 getMsg' p = case mailbox p of
              []    -> Nothing
@@ -77,6 +85,14 @@ getMsg' p = case mailbox p of
 
 getMsg :: Ident -> ProcessQueue -> Maybe Message
 getMsg pid procq = lookup pid procq >>= getMsg'
+
+removeMsg :: Ident -> ProcessState ()
+removeMsg i = do s <- get
+                 let p   = fromJust $ lookup i (pq s)
+                 let p'  = p { mailbox = tail $ mailbox p }
+                 let pq' = pqOp (\_ -> p') i (pq s)
+                 put s { pq = pq' }
+                 return ()
 
 getFunction :: Ident -> ProcessQueue -> Maybe Ident
 getFunction pid procq = lookup pid procq >>= Just . function
@@ -169,14 +185,16 @@ processStep pid
   = do s <- get
        case getMsg pid (pq s) of
          Nothing -> return ()
-         Just x -> case getFunction pid (pq s) >>= flip lookupFunc (fEnv s) of
-                     Nothing -> errorlog ["undefFunc"]
-                     Just fun -> do let nEnv' = insertName (receive fun) x (nEnv s)
-                                    put s{nEnv=nEnv', getPid = pid}
-                                    interpExpr (body fun)
-                                    s' <- get
-                                    put s' { nEnv = nEnv s }
-                                    return ()
+         Just msg -> case getFunction pid (pq s) >>= flip lookupFunc (fEnv s) of
+                      Nothing -> errorlog ["undefFunc"]
+                      Just fun -> do let nEnv' = insertName (receive fun) msg (nEnv s)
+                                     let nEnv'' = insertNames (params fun) (getArguments pid (pq s)) nEnv'
+                                     removeMsg pid
+                                     put s { nEnv=nEnv'', getPid = pid }
+                                     interpExpr (body fun)
+                                     s' <- get
+                                     put s' { nEnv = nEnv s }
+                                     return ()
 
 --
 -- Part 5: Define and implement the round-robin algorithm
