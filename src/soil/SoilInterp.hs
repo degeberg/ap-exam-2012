@@ -230,13 +230,32 @@ runProgRR n = (stdout &&& stderr) . runProgRRfinal n
 --
 -- Part 7: Implement a find all possible executions evaluator
 --
---nextProcAll :: ...
 
---nextProcAll :: ProcessState [Ident]
---nextProcAll = liftM (map fst . filter (not . null . mailbox . snd)) getPQ
+nextProcAll' :: ProcessQueue -> [Ident]
+nextProcAll' = map fst . filter (not . null . mailbox . snd)
 
-nextProcAll :: ProcessQueue -> [Ident]
-nextProcAll = map fst . filter (not . null . mailbox . snd)
+type ProcessStates a = StateT PState [] a
+
+nextProcAll :: ProcessStates [Ident]
+nextProcAll = liftM nextProcAll' (gets pq)
+
+promoteState :: ProcessState a -> ProcessStates a
+promoteState act = do s <- get
+                      let (r,s') = runState act s
+                      put s'
+                      return r
+
+runProgAll' :: Int -> ProcessStates ()
+runProgAll' 0 = return ()
+runProgAll' n = do pids <- nextProcAll
+                   mapM_ (promoteState . processStep) pids
+                   runProgAll' (n - 1)
 
 runProgAll :: Int -> Program -> [([String], [String])]
-runProgAll = undefined
+runProgAll n (fs, as) = map (stdout &&& stderr) states
+    where states = execStateT (inits >> runProgAll' n) (progInit fs)
+          inits  = (promoteState . interpExpr) (Acts as)
+
+--runProgAllFinal n (fs, as) = states
+--    where states = execStateT (inits >> runProgAll' n) (progInit fs)
+--          inits  = (promoteState . interpExpr) (Acts as)
