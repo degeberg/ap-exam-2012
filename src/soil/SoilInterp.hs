@@ -132,7 +132,7 @@ evalPrim Self         = do s <- get
                            return [getPid s]
 evalPrim (Concat a b) = do aPrim <- evalPrim a
                            bPrim <- evalPrim b
-                           return (aPrim ++ bPrim)
+                           return [concat (aPrim ++ bPrim)]
 
 interpExpr :: Expr -> ProcessState ()
 interpExpr (CaseOf _ [] d)
@@ -163,7 +163,7 @@ interpAct (SendTo msgs receiver)
            ["errorlog"] -> errorlog (concat msgs')
            [r]          -> do let pq' = addMsg (concat msgs') r (pq s)
                               put s { pq = pq' }
-           _            -> error "invalid receiver"
+           x            -> error $ "invalid receiver '" ++ show x ++ "'"
 interpAct (Create pid funid vals)
   = do [funid'] <- evalPrim funid
        [pid']   <- evalPrim pid
