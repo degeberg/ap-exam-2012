@@ -2,3 +2,17 @@
 
 \section{Parsing Soil}
 
+The Soil parser is implemented in the \verb|SoilParser| module (see
+\autoref{source:parser}) using the ReadP parser combinator library.
+
+The implementation is straightforward and is mostly done by a direct
+translation from the grammar by creating a parser combinator for each
+nonterminal. This makes verifying correctness easy as there is a clear
+connection between the formal grammar and the implementation in Haskell. The
+parser for the $Prim$ nonterminal stands out in this regard because it was
+necessary eliminating the left-recursion in the grammar.
+
+The chosen type for \verb|Error| is \verb|String|. However, ReadP has no
+support for error messages---unlike e.g.\ Parsec has---so there is no good
+choice of error message. Failure could just as well have been modelled using
+the \verb|Maybe| monad, but this would violate the specified API.
