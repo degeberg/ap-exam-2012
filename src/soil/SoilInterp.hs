@@ -12,6 +12,7 @@ import Data.Maybe
 import Data.List (intercalate)
 import Control.Monad.State
 import Control.Arrow ((&&&))
+import Control.Applicative (pure)
 
 --
 -- Part 1: Define a name environment
@@ -63,21 +64,20 @@ type ProcessQueue = [(Ident, Process)]
 pqOp :: (Process -> Process) -> Ident -> ProcessQueue -> ProcessQueue
 pqOp f pid = map (\(pid', p) -> if pid == pid' then (pid, f p) else (pid', p))
 
-addMsg' :: Message -> Process -> Process
-addMsg' m p = let box = mailbox p
-              in p { mailbox = box ++ [m] }
+procOp :: (Process -> Process) -> Ident -> ProcessState ()
+procOp f pid = do s <- get
+                  case lookup pid (pq s) of
+                    Nothing -> errorlog ["invalidFunction", pid]
+                    Just _  -> put s { pq = pqOp f pid (pq s) }
 
 addMsg :: Message -> Ident -> ProcessState ()
-addMsg msg pid = do s <- get
-                    case lookup pid (pq s) of
-                      Nothing -> errorlog ["invalidReceiver", pid]
-                      Just _  -> put s { pq = pqOp (addMsg' msg) pid (pq s) }
+addMsg msg = procOp (\p -> p { mailbox = mailbox p ++ [msg] })
 
-setFunction :: Ident -> Ident -> ProcessQueue -> ProcessQueue
-setFunction funid = pqOp (\p -> p{function=funid})
+setFunction :: Ident -> Ident -> ProcessState ()
+setFunction funid = procOp (\p -> p { function = funid })
 
-setArguments :: [Ident] -> Ident -> ProcessQueue -> ProcessQueue
-setArguments args = pqOp (\p -> p{arguments=args})
+setArguments :: [Ident] -> Ident -> ProcessState ()
+setArguments args = procOp (\p -> p { arguments = args })
 
 getArguments :: Ident -> ProcessQueue -> [Ident]
 getArguments pid procq = fromJust $ lookup pid procq >>= Just . arguments
@@ -91,11 +91,7 @@ getMsg :: Ident -> ProcessQueue -> Maybe Message
 getMsg pid procq = lookup pid procq >>= getMsg'
 
 removeMsg :: Ident -> ProcessState ()
-removeMsg pid = do s <- get
-                   let p   = fromJust $ lookup pid (pq s)
-                   let p'  = p { mailbox = tail $ mailbox p }
-                   let pq' = pqOp (\_ -> p') pid (pq s)
-                   put s { pq = pq' }
+removeMsg = procOp (\p -> p { mailbox = tail $ mailbox p } )
 
 getFunction :: Ident -> ProcessQueue -> Maybe Ident
 getFunction pid procq = lookup pid procq >>= Just . function
@@ -131,8 +127,7 @@ evalPrim :: Prim -> ProcessState [Ident]
 evalPrim (Id n)       = return [n]
 evalPrim (Par n)      = do s <- get
                            return $ lookupName n (nEnv s)
-evalPrim Self         = do s <- get
-                           return [getPid s]
+evalPrim Self         = gets $ pure . getPid
 evalPrim (Concat a b) = do aPrim <- evalPrim a
                            bPrim <- evalPrim b
                            return [concat (aPrim ++ bPrim)]
@@ -144,9 +139,7 @@ interpExpr (CaseOf switch ((m, e):cs) d)
  = do switch' <- evalPrim switch
       if length switch' == length m
       then do s <- get
-              let nEnv' = foldr (\(n, i) env -> insertName n i env) (nEnv s)
-                            (zipWith (\n i -> (n, [i])) m switch')
-              put s{nEnv=nEnv'}
+              put s { nEnv = insertNames m switch' (nEnv s) }
               interpExpr e
       else interpExpr (CaseOf switch cs d)
 interpExpr (IfEq p1 p2 e1 e2)
@@ -176,10 +169,8 @@ interpAct (Become funid vals)
   = do s <- get
        [funid'] <- evalPrim funid
        vals'    <- mapM evalPrim vals
-       let pq'  = setArguments (concat vals') (getPid s) (pq s)
-       let pq'' = setFunction funid' (getPid s) pq'
-       put s { pq = pq'' }
-
+       setArguments (concat vals') (getPid s)
+       setFunction funid' (getPid s)
 
 processStep :: Ident -> ProcessState ()
 processStep pid
