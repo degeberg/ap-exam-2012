@@ -3,6 +3,8 @@
 
 -import(pm).
 
+-include_lib("eunit/include/eunit.hrl").
+
 pmmap(F, L) ->
     IVars = lists:map(fun(T) ->
                 V = pm:newVanilla(),
@@ -35,3 +37,27 @@ traverse({node, X, L, R}, P) ->
     V = pm:newPrincess(P),
     pm:put(V, X),
     1 + traverse(L, P) + traverse(R, P).
+
+% Tests:
+
+pmmap_empty_test() ->
+    ?assertEqual(pmmap(fun (X) -> X end, []), []).
+
+pmmap_id_test() ->
+    ?assertEqual(pmmap(fun (X) -> X end, [1, 2, 3]), [1, 2, 3]).
+
+pmmap_plus1_test() ->
+    ?assertEqual(pmmap(fun (X) -> X + 1 end, [1, 2, 3]), [2, 3, 4]).
+
+treeforall_empty_test() ->
+    ?assert(treeforall(leaf, fun (_) -> true end)),
+    ?assert(treeforall(leaf, fun (_) -> false end)).
+
+treeforall_single_true_test() ->
+    ?assert(treeforall({node, 1, leaf, leaf}, fun(_) -> true end)).
+
+treeforall_single_false_test() ->
+    ?assertNot(treeforall({node, 1, leaf, leaf}, fun(_) -> false end)).
+
+treeforall_shortcircuit_test() ->
+    ?assertNot(treeforall({node, 1, {node, 2, leaf, leaf}, leaf}, fun(X) -> X =:= 1 end)).
