@@ -30,7 +30,7 @@ insertName n = M.insertWith (\_ -> error $ "Duplicate name '" ++ n ++ "'") n
 
 insertNames :: [Name] -> [Ident] -> NameEnv -> NameEnv
 insertNames ns is e
-  = foldr (\(n, i) env -> insertName n i env) e (zipWith (flip (,) . return) ns is)
+  = foldr (\(n, i) env -> insertName n i env) e (zipWith (\n i -> (n, [i])) ns is)
 
 --
 -- Part 2: Define a function environment
