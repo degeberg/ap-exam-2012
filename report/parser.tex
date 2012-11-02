@@ -16,3 +16,15 @@ The chosen type for \verb|Error| is \verb|String|. However, ReadP has no
 support for error messages---unlike e.g.\ Parsec has---so there is no good
 choice of error message. Failure could just as well have been modelled using
 the \verb|Maybe| monad, but this would violate the specified API.
+
+\subsection{Testing}
+
+The parser has been testing by unit testing using QuickCheck. Although
+``proper'' properties have not been used, QuickCheck was chosen over HUnit
+because it would make it easier adding more interesting properties later
+without having to switch test framework.
+
+The unit tests are simply checking the output of \verb|parseString| on a number
+of programs with an expected AST. These were manually verified.
+\verb|parseFile| is not tested automatically, but the definition is so simple
+that it is easy to verify its correctness manually.
