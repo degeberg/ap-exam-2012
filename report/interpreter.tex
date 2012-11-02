@@ -2,3 +2,71 @@
 
 \section{Interpreting Soil}
 
+The interpreter is implemented in the \verb|SoilInterp| module.
+
+\subsection{Name and function environments}
+
+The environments are simply \verb|Data.Map.Map|s. This makes lookups and
+inserts easy in $O(\log n)$ time.
+
+\subsection{Process queues}
+
+The process queue is a simple association list with process IDs as the key.
+Most of the utility functions are in a \verb|State| monad called
+\verb|ProcessState|. The following things are in the state:
+
+\begin{enumerate}
+    \item Name environment
+    \item Function environment
+    \item Process queue
+    \item Currently executing PID
+    \item stdout
+    \item stderr
+\end{enumerate}
+
+These things are useful when interpreting because the process queue utility
+functions are in monadic style simply updating the state. These are all simple
+one-line functions using the helper functions \verb|pqOp| and \verb|procOp|.
+\verb|pqOp| applies a function to the process having a matching PID.
+\verb|procOp| does this in monadic style with a state monad.
+
+\subsection{Executing a process step}
+
+When executing a process step, we first set the name environment and make sure
+we remove the process' message. It is assumed that any PID given to
+\verb|processStep| actually has a message. This should be taken care of by the
+scheduler. This is slightly different from the suggested outline that states it
+should simply do nothing.
+
+Interpreting the process function's body is done by \verb|interpExpr|. This is
+on simple pattern matching on the AST. This uses \verb|evalPrim| and
+\verb|interpAct| to interpret the remaining data types in the AST.
+
+If the process is one of the special \verb|#println| or \verb|#errorlog|
+processes it updates the stdout and stderr state with whatever is in the inbox.
+
+\subsection{Round-robin scheduling}
+
+Round-robin scheduling just takes the first process with a non-empty mailbox
+moving each to the back of the queue. When interpreting, we must first
+initialize the state by populating the function environment and inserting two
+dummy processes for \verb|#println| and \verb|#errorlog|.
+
+\subsection{Nondeterministic process scheduling}
+\label{nondet}
+
+I was unable to complete the implementation of \verb|runProgAll|. An attempt is
+in \verb|SoilInterp.hs|, but it doesn't work correctly\footnote{Although it
+does type check, so according to Ken it must be correct.}. It always returns a
+list with only one state.
+
+\subsection{Testing}
+
+Testing is done using QuickCheck with the same justification as in
+\autoref{parser_testing}. This is in the \verb|SoilInterpTest.hs| file. The
+test suite has a test for each example program and each scheduler. The three
+tests for \verb|runProgAll| obviously fail as it's not implemented correctly as
+explained in \autoref{nondet}.
+
+The interpreter works correctly with round-robin on all the example programs.
+It is then reasonable to assume that the interpreter works correctly.
