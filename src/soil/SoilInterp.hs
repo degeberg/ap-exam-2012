@@ -58,6 +58,15 @@ data Process = Process { function  :: Ident
 
 type ProcessQueue = [(Ident, Process)]
 
+data PState = PState { nEnv   :: NameEnv
+                     , fEnv   :: FuncEnv
+                     , pq     :: ProcessQueue
+                     , getPid :: Ident
+                     , stdout :: [String]
+                     , stderr :: [String]
+                     } deriving (Show)
+type ProcessState = State PState
+
 -- Function for process modification
 
 pqOp :: (Process -> Process) -> Ident -> ProcessQueue -> ProcessQueue
@@ -96,15 +105,6 @@ addProcess pid p q = q ++ [(pid, p)]
 --
 -- Part 4: Define and implement a process step
 --
-
-data PState = PState { nEnv   :: NameEnv
-                     , fEnv   :: FuncEnv
-                     , pq     :: ProcessQueue
-                     , getPid :: Ident
-                     , stdout :: [String]
-                     , stderr :: [String]
-                     } deriving (Show)
-type ProcessState = State PState
 
 outputString :: Message -> String
 outputString = intercalate ":"
@@ -219,10 +219,10 @@ runProgRR n = (stdout &&& stderr) . runProgRRfinal n
 -- Part 7: Implement a find all possible executions evaluator
 --
 
+type ProcessStates a = StateT PState [] a
+
 nextProcAll' :: ProcessQueue -> [Ident]
 nextProcAll' = map fst . filter (not . null . mailbox . snd)
-
-type ProcessStates a = StateT PState [] a
 
 nextProcAll :: ProcessStates [Ident]
 nextProcAll = liftM nextProcAll' (gets pq)
