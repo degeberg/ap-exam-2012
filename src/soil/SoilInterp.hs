@@ -8,7 +8,6 @@ module SoilInterp where
 import SoilAst
 
 import qualified Data.Map as M
-import qualified Data.Foldable as F
 import Data.Maybe
 import Data.List (intercalate)
 import Control.Monad.State
@@ -75,7 +74,7 @@ pqOp f pid = map (\(pid', p) -> if pid == pid' then (pid, f p) else (pid', p))
 procOp :: (Process -> Process) -> Ident -> ProcessState ()
 procOp f pid = do s <- get
                   case lookup pid (pq s) of
-                    Nothing -> errorlog ["invalidFunction", pid]
+                    Nothing -> addMsg ["invalidFunction", pid] "errorlog"
                     Just _  -> put s { pq = pqOp f pid (pq s) }
 
 addMsg :: Message -> Ident -> ProcessState ()
@@ -86,6 +85,9 @@ setFunction funid = procOp (\p -> p { function = funid })
 
 setArguments :: [Ident] -> Ident -> ProcessState ()
 setArguments args = procOp (\p -> p { arguments = args })
+
+setNewFunc :: Ident -> [Ident] -> Ident -> ProcessState()
+setNewFunc funid args = procOp (\p -> p { function = funid, arguments = args})
 
 getArguments :: Ident -> ProcessQueue -> [Ident]
 getArguments pid procq = fromJust $ lookup pid procq >>= Just . arguments
@@ -148,10 +150,8 @@ interpAct (SendTo msgs receiver)
   = do receiver' <- evalPrim receiver
        msgs'     <- mapM evalPrim msgs
        case receiver' of
-           ["println"]  -> println (concat msgs')
-           ["errorlog"] -> errorlog (concat msgs')
-           [r]          -> addMsg (concat msgs') r
-           x            -> error $ "invalid receiver '" ++ show x ++ "'"
+           [r] -> addMsg (concat msgs') r
+           x   -> error $ "invalid receiver '" ++ show x ++ "'"
 interpAct (Create pid funid vals)
   = do [funid'] <- evalPrim funid
        [pid']   <- evalPrim pid
@@ -163,26 +163,25 @@ interpAct (Become funid vals)
   = do s <- get
        [funid'] <- evalPrim funid
        vals'    <- mapM evalPrim vals
-       setArguments (concat vals') (getPid s)
-       setFunction funid' (getPid s)
-
-processStep' :: Ident -> Message -> ProcessState ()
-processStep' pid msg
-  = do s <- get
-       case getFunction pid (pq s) >>= flip lookupFunc (fEnv s) of
-         Nothing  -> errorlog ["undefFunc"]
-         Just fun -> do let nEnv'  = insertName (receive fun) msg (nEnv s)
-                        let nEnv'' = insertNames (params fun) (getArguments pid (pq s)) nEnv'
-                        put s { nEnv=nEnv'', getPid = pid }
-                        removeMsg pid -- will not fail
-                        interpExpr (body fun)
-                        s' <- get
-                        put s' { nEnv = nEnv s } -- restore nEnv
+       setNewFunc funid' (concat vals') (getPid s)
 
 processStep :: Ident -> ProcessState ()
 processStep pid
   = do s <- get
-       F.forM_ (getMsg pid (pq s)) (processStep' pid)
+       let msg = fromJust $ getMsg pid (pq s)
+       case pid of
+         "println"  -> println  msg >> removeMsg pid
+         "errorlog" -> errorlog msg >> removeMsg pid
+         _ -> case getFunction pid (pq s) >>= flip lookupFunc (fEnv s) of
+                Nothing  -> addMsg ["undefFunc"] "errorlog"
+                Just fun -> do let nEnv'  = insertName (receive fun) msg (nEnv s)
+                               let nEnv'' = insertNames (params fun)
+                                    (getArguments pid (pq s)) nEnv'
+                               put s { nEnv=nEnv'', getPid = pid }
+                               removeMsg pid -- will not fail
+                               interpExpr (body fun)
+                               s' <- get
+                               put s' { nEnv = nEnv s } -- restore nEnv
 
 --
 -- Part 5: Define and implement the round-robin algorithm
@@ -194,20 +193,26 @@ nextProcessRR
        case pq s of
          []            -> error "no processes"
          ((pid, p):xs) -> do put s { pq = addProcess pid p xs }
-                             return pid
+                             case getMsg pid (pq s) of
+                               Nothing -> nextProcessRR
+                               Just _  -> return pid
 
 --
 -- Part 6: Implement the round-robin evaluator
 --
 
 progInit :: [Func] -> PState
-progInit fs = PState ne fe [] "main" [] []
-    where ne = M.empty
-          fe = foldr (\f e -> insertFunc (funcname f) f e) M.empty fs
+progInit fs = PState ne fe [("println", printlnP), ("errorlog", errorlogP)] "main" [] []
+    where ne        = M.empty
+          fe        = foldr (\f e -> insertFunc (funcname f) f e) M.empty fs
+          printlnP  = Process "println" ["str"] []
+          errorlogP = Process "errorlog" ["str"] []
 
 runProgRR' :: Int -> ProcessState ()
 runProgRR' 0 = return ()
-runProgRR' n = nextProcessRR >>= processStep >> runProgRR' (n - 1)
+runProgRR' n = do procq <- gets pq
+                  unless (null $ nextProcAll' procq)
+                      (nextProcessRR >>= processStep >> runProgRR' (n - 1))
 
 runProgRRfinal :: Int -> Program -> PState
 runProgRRfinal n (fs, as) = execState (interpExpr (Acts as) >> runProgRR' n) (progInit fs)
