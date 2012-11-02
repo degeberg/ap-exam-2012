@@ -61,3 +61,6 @@ treeforall_single_false_test() ->
 
 treeforall_shortcircuit_test() ->
     ?assertNot(treeforall({node, 1, {node, 2, leaf, leaf}, leaf}, fun(X) -> X =:= 1 end)).
+
+treeforall_multiple_true_test() ->
+    ?assert(treeforall({node, 1, {node, 2, leaf, leaf}, leaf}, fun(_) -> true end)).
