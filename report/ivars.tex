@@ -2,3 +2,110 @@
 
 \section{IVars in Erlang}
 
+The IVars have been implemented in the \verb|pm| module. An IVar is represented
+by an Erlang process, operations on an IVar work by simple message passing.
+
+They are implemented with two state functions
+\verb|{vanilla,princess}_{set,unset}| giving a simple state machine. When an
+IVar gets set it changes to work on its \verb|set| function. This design makes
+it easy to distinguish behaviour on set and unset IVars.
+
+Invalid predicates in princess IVars are handled using a \verb|try-catch| so
+any exception will result in \verb|false|, and all non-\verb|true| values are
+considered \verb|false| likewise.
+
+\subsection{The \texttt{pmuse} module}
+\label{module_pmuse}
+
+The \verb|pmmap/2| and \verb|treeforall/2| functions are implemented in the
+\verb|pmuse| module.
+
+\verb|pmmap/2| initializes a vanilla IVar per element in the list and spawns a
+new process putting the computed value in the IVar. This spawn gives the
+concurrency as the function value can be computed in parallel. Then we just get
+all the values in order. This ensures that order is preserved like in the
+built-in \verb|lists:map/2|.
+
+Assuming perfect concurrency, this would mean that mapping the function $f$
+over a list $A$ takes $\max_{x \in A} T(f(x))$ time where $T(e)$ is the runtime
+of executing some Erlang expression $e$. We can verify that the execution is
+concurrent by running the program in \autoref{pmusecon}. Assuming we are able
+to evaluate two things concurrently, this should take about 10 seconds in
+total, whereas the normal, non-concurrent \verb|lists:map/2| would take about
+20 seconds.
+
+\begin{lstlisting}[language=Erlang,caption={Testing concurrency of \texttt{pmmap}},label=pmusecon]
+pmuse:pmmap(fun(X) -> timer:sleep(10000), X end, [1, 2]).
+\end{lstlisting}
+
+The \verb|treeforall/2| function is implemented using princess IVars. First we
+modify the predicate to also send a message back with the result of the
+predicate check. Then we traverse the tree starting a princess IVar for each
+node with this modified predicate, and we count the number of nodes. Knowing
+the number of nodes we know the maximum number of results we receive. When
+gathering up the result we know the result immediately if we get a \verb|false|
+and just return. We can verify \verb|treeforall/2|'s short-circuit semantics
+using \autoref{treeforallcon}. If short-circuiting works, this will return
+\verb|false| immediately, and if it doesn't work, it would return after about
+10 seconds.
+
+\begin{lstlisting}[language=Erlang,caption={Testing short-circuit semantics of \texttt{treeforall}},label=treeforallcon]
+pmuse:treeforall(
+    {node, 1, {node, 2, leaf, leaf}, leaf},
+    fun(X) ->
+        case X of
+            1 -> timer:sleep(10000), true;
+            2 -> false
+        end
+    end
+).
+\end{lstlisting}
+
+\subsection{Testing}
+
+The modules have been tested using EUnit. The test suites may be run by calling
+\verb|pm:test/0| and \verb|pmuse:test/0|. The following tests are executed:
+
+\begin{enumerate}
+    \item \texttt{pm}
+    \begin{enumerate}
+        \item Princess IVar
+        \begin{enumerate}
+            \item Unset variables are not compromised.
+            \item Set variables are not compromised.
+            \item Variables attempted to be set twice are not compromised.
+            \item Values cannot be changed.
+            \item Only a value satisfying the predicate is saved.
+            \item Failing predicates work like \verb|false|.
+        \end{enumerate}
+        \item Vanilla IVar
+        \begin{enumerate}
+            \item Unset variables are not compromised.
+            \item Variables are not compromised by being set.
+            \item Variables are compromised by being set twice.
+            \item Values cannot be changed.
+        \end{enumerate}
+    \end{enumerate}
+    \item \texttt{pmuse}
+    \begin{enumerate}
+        \item \texttt{pmmap/2}
+        \begin{enumerate}
+            \item Mapping over the empty list is the empty list.
+            \item Mapping with the identity function over a non-empty doesn't change the list.
+            \item Order is preserved.
+        \end{enumerate}
+        \item \texttt{treeforall/2}
+        \begin{enumerate}
+            \item The empty tree satisfies any predicate.
+            \item A singleton tree is satisfied by an always true predicate.
+            \item A singleton tree is not satisfied by an always false predicate.
+            \item Any node not satisfying a predicate will make the entire tree fail.
+            \item A tree with multiple nodes all satisfying the predicate is satisfied.
+        \end{enumerate}
+    \end{enumerate}
+\end{enumerate}
+
+These tests along with the programs in \autoref{module_pmuse} verifying
+concurrency and short-circuit semantics for \verb|pmmap/2| and
+\verb|treeforall/2|, respectively, give a reasonable assurance that the
+modules' functionality is correct.
