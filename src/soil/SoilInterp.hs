@@ -1,8 +1,3 @@
---
--- Skeleton for Soil interpreter
--- To be used at the exam for Advanced Programming, B1-2012
---
-
 module SoilInterp where
 
 import SoilAst

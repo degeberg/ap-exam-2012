@@ -1,8 +1,3 @@
---
--- Skeleton for Soil parser
--- To be used at the exam for Advanced Programming, B1-2012
---
-
 module SoilParser (parseString, parseFile) where
 
 import SoilAst
