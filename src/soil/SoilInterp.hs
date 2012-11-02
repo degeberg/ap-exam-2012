@@ -130,12 +130,12 @@ interpExpr :: Expr -> ProcessState ()
 interpExpr (CaseOf _ [] d)
   = interpExpr d
 interpExpr (CaseOf switch ((m, e):cs) d)
- = do switch' <- evalPrim switch
-      if length switch' == length m
-      then do s <- get
-              put s { nEnv = insertNames m switch' (nEnv s) }
-              interpExpr e
-      else interpExpr (CaseOf switch cs d)
+  = do switch' <- evalPrim switch
+       if length switch' == length m
+       then do s <- get
+               put s { nEnv = insertNames m switch' (nEnv s) }
+               interpExpr e
+       else interpExpr (CaseOf switch cs d)
 interpExpr (IfEq p1 p2 e1 e2)
   = do p1e <- evalPrim p1
        p2e <- evalPrim p2
@@ -171,7 +171,7 @@ processStep' pid msg
   = do s <- get
        case getFunction pid (pq s) >>= flip lookupFunc (fEnv s) of
          Nothing  -> errorlog ["undefFunc"]
-         Just fun -> do let nEnv' = insertName (receive fun) msg (nEnv s)
+         Just fun -> do let nEnv'  = insertName (receive fun) msg (nEnv s)
                         let nEnv'' = insertNames (params fun) (getArguments pid (pq s)) nEnv'
                         put s { nEnv=nEnv'', getPid = pid }
                         removeMsg pid -- will not fail
@@ -192,9 +192,9 @@ nextProcessRR :: ProcessState Ident
 nextProcessRR
   = do s <- get
        case pq s of
-            []            -> error "no processes"
-            ((pid, p):xs) -> do put s { pq = addProcess pid p xs }
-                                return pid
+         []            -> error "no processes"
+         ((pid, p):xs) -> do put s { pq = addProcess pid p xs }
+                             return pid
 
 --
 -- Part 6: Implement the round-robin evaluator
