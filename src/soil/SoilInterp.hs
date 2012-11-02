@@ -75,12 +75,6 @@ procOp f pid = do s <- get
 addMsg :: Message -> Ident -> ProcessState ()
 addMsg msg = procOp (\p -> p { mailbox = mailbox p ++ [msg] })
 
-setFunction :: Ident -> Ident -> ProcessState ()
-setFunction funid = procOp (\p -> p { function = funid })
-
-setArguments :: [Ident] -> Ident -> ProcessState ()
-setArguments args = procOp (\p -> p { arguments = args })
-
 setNewFunc :: Ident -> [Ident] -> Ident -> ProcessState()
 setNewFunc funid args = procOp (\p -> p { function = funid, arguments = args})
 
